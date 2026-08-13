@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>익명 신문고</title>
+    <style>
+        /* 기본 스타일 설정 */
+        body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
+        header { background-color: #2c3e50; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        h1 { margin: 0; font-size: 24px; }
+        .container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        /* 폼 요소 스타일 */
+        input[type="text"], input[type="password"], input[type="date"], textarea, select {
+            width: 100%; padding: 10px; margin: 8px 0 15px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;
+        }
+        input[readonly] { background-color: #e9ecef; cursor: not-allowed; }
+        textarea { height: 150px; resize: vertical; }
+        button { background-color: #3498db; color: white; border: none; padding: 10px 15px; cursor: pointer; border-radius: 4px; font-weight: bold; }
+        button:hover { background-color: #2980b9; }
+        .btn-success { background-color: #2ecc71; }
+        .btn-success:hover { background-color: #27ae60; }
+        .btn-danger { background-color: #e74c3c; }
+        .btn-danger:hover { background-color: #c0392b; }
+        .btn-header { background-color: #ecf0f1; color: #2c3e50; margin-left: 5px; }
+        
+        /* 언어 선택 버튼 스타일 */
+        .lang-btn { background-color: #7f8c8d; font-size: 11px; padding: 6px 8px; margin-left: 3px; }
+        .lang-btn.active { background-color: #e67e22; }
+
+        /* 팝업 모달 스타일 */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 350px; box-shadow: 0 4px 6px rgba(0,0,0,0.2); position: relative; max-height: 85vh; overflow-y: auto; }
+        
+        .modal-content-large { width: 90%; max-width: 800px; margin: 5% auto; }
+        #createAccountModal { z-index: 1010; }
+        #editAccountModal { z-index: 1010; }
+        
+        .close { position: absolute; right: 15px; top: 15px; font-size: 20px; cursor: pointer; }
+        
+        /* 테이블 스타일 */
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #f2f2f2; }
+        .list-row { cursor: pointer; }
+        .list-row:hover { background-color: #f9f9f9; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #postDetailModal, #postDetailModal * { visibility: visible; }
+            #postDetailModal { position: absolute; left: 0; top: 0; width: 100%; background: transparent; }
+            #postDetailModal .modal-content { width: 100%; max-width: 100%; margin: 0; padding: 0; box-shadow: none; border: none; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="no-print">
+    <h1>익명 신문고</h1>
+    <div style="display: flex;">
+        <button id="adminLoginBtn" class="btn-header" onclick="openLoginModal()">관리자 모드</button>
+        <button id="headerCreateAccBtn" class="btn-header btn-success" onclick="openCreateAccountModal()" style="display:none; color:white;">+ 신규계정생성</button>
+        <button id="accountManageBtn" class="btn-header" onclick="openAccountModal()" style="display:none;">계정관리</button>
+        <button id="adminLogoutBtn" class="btn-header" onclick="logout()" style="display:none;">로그아웃</button>
+    </div>
+</header>
+
+<div class="container" id="mainContainer">
+    <!-- 사용자 모드 (작성 폼) -->
+    <div id="userMode">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2 data-i18n="formTitle" style="margin: 0;">의견 작성 (익명)</h2>
+            <div>
+                <button type="button" id="btnLangKo" class="lang-btn active" onclick="changeLanguage('ko')">한국어</button>
+                <button type="button" id="btnLangNe" class="lang-btn" onclick="changeLanguage('ne')">नेपाली(네팔어)</button>
+                <button type="button" id="btnLangBn" class="lang-btn" onclick="changeLanguage('bn')">বাংলা(벵골어)</button>
+            </div>
+        </div>
+        
+        <label data-i18n="lblId">고유번호 (자동생성)</label>
+        <input type="text" id="postGeneratedId" readonly>
+
+        <label data-i18n="lblDate">작성일</label>
+        <input type="date" id="postDate">
+        
+        <label data-i18n="lblTitle">제목</label>
+        <input type="text" id="postTitle" data-i18n-placeholder="plcTitle" placeholder="제목을 입력하세요">
+        
+        <label data-i18n="lblContent">내용</label>
+        <textarea id="postContent" data-i18n-placeholder="plcContent" placeholder="내용을 입력하세요"></textarea>
+        
+        <label data-i18n="lblPw">비밀번호 (숫자 4자리 - 본인 확인 및 수정/삭제용)</label>
+        <input type="password" id="postPw" maxlength="4" data-i18n-placeholder="plcPw" placeholder="예: 1234">
+        
+        <button onclick="submitPost()" id="submitBtn" disabled>데이터 로딩중...</button>
+
+        <hr style="margin:30px 0; border:0; border-top:1px solid #ddd;">
+
+        <h2 data-i18n="searchHeader">내 의견 확인 및 수정/삭제</h2>
+        <p data-i18n="searchDesc" style="font-size:12px; color:#7f8c8d;">※ 글 작성 시 부여받은 고유 번호와 비밀번호를 입력하세요.</p>
+        <input type="text" id="searchId" data-i18n-placeholder="plcSearchId" placeholder="고유 번호 (예: 20260810-001)">
+        <input type="password" id="searchPw" maxlength="4" data-i18n-placeholder="plcSearchPw" placeholder="비밀번호 4자리">
+        <button onclick="findMyPost()" data-i18n="btnSearch">조회하기</button>
+    </div>
+
+    <!-- 일반 관리자 모드 (신문고 목록) -->
+    <div id="adminMode" style="display:none;">
+        <h2>접수된 신문고 목록</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th width="20%">고유번호</th>
+                    <th width="15%">작성일</th>
+                    <th width="40%">제목</th>
+                    <th width="25%">조치 상황</th>
+                </tr>
+            </thead>
+            <tbody id="adminTableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- 슈퍼 관리자 모드 -->
+    <div id="superAdminMode" style="display:none; text-align: center; padding: 40px 0;">
+        <h2>슈퍼 관리자 모드</h2>
+        <p style="color: #7f8c8d;">상단의 <strong>[신규계정생성]</strong> 버튼 또는 아래 버튼을 통해 관리자 계정을 관리하세요[cite: 1].</p>
+        <button class="btn-success" onclick="openAccountModal()" style="font-size: 16px; padding: 15px 30px;">관리자 계정 목록 관리 열기</button>
+    </div>
+</div>
+
+<!-- 상세 내용 확인 팝업 (관리자 전체 자동 번역 기능 포함) -->
+<div id="postDetailModal" class="modal">
+    <div class="modal-content modal-content-large">
+        <span class="close no-print" onclick="closeDetail()">&times;</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #2c3e50; padding-bottom: 10px; margin-top: 0;">
+            <h2 id="viewTitle" style="margin: 0;"></h2>
+            <!-- 관리자용 전체 번역 버튼 -->
+            <button id="translateBtn" class="no-print btn-success" style="display:none; font-size: 12px; padding: 5px 10px;" onclick="toggleTranslation()">🇰🇷 한국어 번역 보기</button>
+        </div>
+        <p><strong>고유번호:</strong> <span id="viewId"></span></p>
+        <p><strong>작성일:</strong> <span id="viewDate"></span></p>
+        <p><strong>작성 언어:</strong> <span id="viewLang"></span></p>
+        <p><strong>조치 상황:</strong> 
+            <span id="viewStatusText"></span>
+            <select id="viewStatusSelect" class="no-print" style="display:none; width:auto; margin:0;" onchange="updateStatusFromDetail(this.value)">
+                <option value="접수대기">접수대기</option>
+                <option value="조치중">조치중</option>
+                <option value="조치완료">조치완료</option>
+            </select>
+        </p>
+        <div style="min-height: 150px; background: #f9f9f9; padding: 15px; border-radius: 5px; margin-bottom: 20px;">
+            <p id="viewContent" style="white-space: pre-wrap;"></p>
+        </div>
+        
+        <div class="no-print">
+            <button onclick="window.print()">내용 인쇄하기</button>
+            <button id="deleteBtn" class="btn-danger" onclick="deletePost()">삭제하기</button>
+            <button onclick="closeDetail()" style="background-color: #95a5a6;">닫기</button>
+        </div>
+    </div>
+</div>
+
+<!-- 로그인 및 계정관리 팝업 모달들 -->
+<div id="loginModal" class="modal no-print">
+    <div class="modal-content">
+        <span class="close" onclick="closeLoginModal()">&times;</span>
+        <h3 style="margin-top:0;">관리자 로그인</h3>
+        <input type="text" id="adminId" placeholder="아이디">
+        <input type="password" id="adminPw" placeholder="비밀번호">
+        <button onclick="login()" style="width:100%;">로그인</button>
+    </div>
+</div>
+
+<div id="accountModal" class="modal no-print">
+    <div class="modal-content">
+        <span class="close" onclick="closeAccountModal()">&times;</span>
+        <h3 style="margin-top:0;">계정 관리</h3>
+        <h4 style="margin-bottom: 5px;">관리자 계정 목록</h4>
+        <p style="font-size:11px; color:gray; margin-top:0;">※ 수정할 아이디를 클릭하세요.</p>
+        <ul id="accountList" style="list-style: none; padding: 0; margin: 0; max-height: 250px; overflow-y: auto; background:#f9f9f9; border:1px solid #ddd; padding:5px;"></ul>
+    </div>
+</div>
+
+<div id="createAccountModal" class="modal no-print">
+    <div class="modal-content">
+        <span class="close" onclick="closeCreateAccountModal()">&times;</span>
+        <h3 style="margin-top:0;">신규 계정 생성</h3>
+        <label>아이디</label>
+        <input type="text" id="newAccId" placeholder="새 아이디">
+        <label>비밀번호</label>
+        <input type="password" id="newAccPw" placeholder="새 비밀번호">
+        <label>이름</label>
+        <input type="text" id="newAccName" placeholder="관리자 이름">
+        <label>연락처</label>
+        <input type="text" id="newAccContact" placeholder="예: 010-1234-5678">
+        <label>E-mail</label>
+        <input type="text" id="newAccEmail" placeholder="example@email.com">
+        <button class="btn-success" onclick="saveNewAccount()" style="width:100%;">계정 생성하기</button>
+    </div>
+</div>
+
+<div id="editAccountModal" class="modal no-print">
+    <div class="modal-content">
+        <span class="close" onclick="closeEditAccountModal()">&times;</span>
+        <h3 style="margin-top:0;">계정 정보 수정</h3>
+        <label>수정할 아이디</label>
+        <input type="text" id="editAccId" readonly>
+        <div id="oldPwContainer">
+            <label>기존 비밀번호</label>
+            <input type="password" id="editOldPw" placeholder="현재 비밀번호를 입력하세요">
+        </div>
+        <label>새 비밀번호 (변경시에만 입력)</label>
+        <input type="password" id="editNewPw" placeholder="변경할 비밀번호">
+        <label>이름</label>
+        <input type="text" id="editAccName" placeholder="관리자 이름">
+        <label>연락처</label>
+        <input type="text" id="editAccContact" placeholder="예: 010-1234-5678">
+        <label>E-mail</label>
+        <input type="text" id="editAccEmail" placeholder="example@email.com">
+        <button onclick="updateAccount()" style="width:100%;">계정 정보 수정 저장</button>
+    </div>
+</div>
+
+<!-- 스크립트 영역 -->
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyBRwg3k5usuMkBXH9LB6T-9Uuw9ZU1TBMs",
+        authDomain: "formeng-7c4b3.firebaseapp.com",
+        databaseURL: "https://formeng-7c4b3-default-rtdb.asia-southeast1.firebasedatabase.app",
+        projectId: "formeng-7c4b3",
+        storageBucket: "formeng-7c4b3.firebasestorage.app",
+        messagingSenderId: "745402830490",
+        appId: "1:745402830490:web:fc3a3b36568da59ab8d923"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const SUPER_ID = 'admin';
+    const SUPER_PW = '140916Open@';
+
+    let adminAccounts = [];
+    let posts = [];
+    
+    let isAdmin = false;
+    let isSuperAdmin = false;
+    let currentLoggedId = null;
+    let currentViewPostId = null;
+    let isTranslated = false;
+    let translatedCache = { title: "", content: "" }; // 번역 캐시 저장용
+
+    // --- 다국어 번역 사전 ---
+    const translations = {
+        ko: {
+            formTitle: "의견 작성 (익명)",
+            lblId: "고유번호 (자동생성)",
+            lblDate: "작성일",
+            lblTitle: "제목",
+            lblContent: "내용",
+            lblPw: "비밀번호 (숫자 4자리 - 본인 확인 및 수정/삭제용)",
+            btnSubmit: "작성하기",
+            searchHeader: "내 의견 확인 및 수정/삭제",
+            searchDesc: "※ 글 작성 시 부여받은 고유 번호와 비밀번호를 입력하세요.",
+            plcTitle: "제목을 입력하세요",
+            plcContent: "내용을 입력하세요",
+            plcPw: "예: 1234",
+            plcSearchId: "고유 번호 (예: 20260810-001)",
+            plcSearchPw: "비밀번호 4자리",
+            btnSearch: "조회하기",
+            loading: "데이터 로딩중..."
+        },
+        ne: {
+            formTitle: "सुझाव/गुनासो लेख्नुहोस् (बेनामी)",
+            lblId: "अदितीय नम्बर (स्वचालित)",
+            lblDate: "मिति",
+            lblTitle: "शीर्षक",
+            lblContent: "विवरण",
+            lblPw: "पासवर्ड (४ अंक - जाँच/संशोधन/मेटाउनका लागि)",
+            btnSubmit: "पेश गर्नुहोस्",
+            searchHeader: "मेरो गुनासो जाँच / संशोधन / मेटाउनुहोस्",
+            searchDesc: "※ कृपया प्राप्त अद्वितीय नम्बर र पासवर्ड प्रविष्ट गर्नुहोस्।",
+            plcTitle: "शीर्षक लेख्नुहोस्",
+            plcContent: "विवरण लेख्नुहोस्",
+            plcPw: "उदा: १२३४",
+            plcSearchId: "अदितीय नम्बर (जस्तै: 20260810-001)",
+            plcSearchPw: "४ अंकको पासवर्ड",
+            btnSearch: "खोजी गर्नुहोस्",
+            loading: "डेटा लोड हुँदैछ..."
+        },
+        bn: {
+            formTitle: "মতামত লিখুন (বেনামী)",
+            lblId: "অনন্য নম্বর (স্বয়ংক্রিয়)",
+            lblDate: "তারিখ",
+            lblTitle: "শিরোনাম",
+            lblContent: "বিষয়বস্তু",
+            lblPw: "পাসওয়ার্ড (৪ ডিজিট - যাচাই/সংশোধন/মুছে ফেলতে)",
+            btnSubmit: "জমা দিন",
+            searchHeader: "আমার মতামত যাচাই এবং সংশোধন/মুছে ফেলুন",
+            searchDesc: "※ লেখার সময় প্রাপ্ত অনন্য নম্বর এবং পাসওয়ার্ড লিখুন।",
+            plcTitle: "শিরোনাম লিখুন",
+            plcContent: "বিষয়বস্তু লিখুন",
+            plcPw: "যেমন: ১২৩৪",
+            plcSearchId: "অনন্য নম্বর (যেমন: 20260810-001)",
+            plcSearchPw: "৪ ডিজিটের পাসওয়ার্ড",
+            btnSearch: "অনুসন্ধান করুন",
+            loading: "ডেটা লোড হচ্ছে..."
+        }
+    };
+
+    let currentLang = 'ko';
+
+    function changeLanguage(lang) {
+        currentLang = lang;
+        
+        document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+        if(lang === 'ko') document.getElementById('btnLangKo').classList.add('active');
+        if(lang === 'ne') document.getElementById('btnLangNe').classList.add('active');
+        if(lang === 'bn') document.getElementById('btnLangBn').classList.add('active');
+
+        const t = translations[lang];
+        document.querySelectorAll('[data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if(t[key]) el.innerText = t[key];
+        });
+
+        document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+            const key = el.getAttribute('data-i18n-placeholder');
+            if(t[key]) el.placeholder = t[key];
+        });
+
+        const submitBtn = document.getElementById('submitBtn');
+        if(submitBtn.disabled) {
+            submitBtn.innerText = t.loading;
+        } else {
+            submitBtn.innerText = t.btnSubmit;
+        }
+    }
+    window.changeLanguage = changeLanguage;
+
+    async function loadDataFromFirebase() {
+        try {
+            const postSnapshot = await getDocs(collection(db, "posts"));
+            posts = postSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+            
+            const accSnapshot = await getDocs(collection(db, "adminAccounts"));
+            adminAccounts = accSnapshot.docs.map(doc => ({ docId: doc.id, ...doc.data() }));
+
+            if(adminAccounts.length === 0) {
+                const defaultAcc = { id: '1', pw: '1', name: '기본관리자', contact: '', email: '' };
+                const docRef = await addDoc(collection(db, "adminAccounts"), defaultAcc);
+                adminAccounts.push({ docId: docRef.id, ...defaultAcc });
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = false;
+            submitBtn.innerText = translations[currentLang].btnSubmit;
+            updateGeneratedIdView();
+            
+        } catch (error) {
+            console.error("데이터 로딩 실패: ", error);
+            alert("Firebase 데이터베이스 연결에 실패했습니다.");
+        }
+    }
+
+    window.onload = () => {
+        document.getElementById('postDate').value = new Date().toISOString().substring(0, 10);
+        loadDataFromFirebase();
+    };
+
+    function getNextIdStr() {
+        const dateStr = document.getElementById('postDate').value.replace(/-/g, '');
+        const todayPosts = posts.filter(p => String(p.id).startsWith(dateStr + '-'));
+        
+        let maxCount = 0;
+        todayPosts.forEach(p => {
+            const parts = String(p.id).split('-');
+            if(parts.length === 2) {
+                const num = parseInt(parts[1], 10);
+                if(!isNaN(num) && num > maxCount) {
+                    maxCount = num;
+                }
+            }
+        });
+        const nextCount = maxCount + 1;
+        return `${dateStr}-${String(nextCount).padStart(3, '0')}`;
+    }
+
+    function updateGeneratedIdView() {
+        document.getElementById('postGeneratedId').value = getNextIdStr();
+    }
+    document.getElementById('postDate').addEventListener('change', updateGeneratedIdView);
+
+    async function submitPost() {
+        const date = document.getElementById('postDate').value;
+        const title = document.getElementById('postTitle').value.trim();
+        const content = document.getElementById('postContent').value.trim();
+        const pw = document.getElementById('postPw').value;
+
+        if(!date || !title || !content || !pw) return alert("모든 항목을 입력해주세요.");
+        if(!/^\d{4}$/.test(pw)) return alert("비밀번호는 숫자 4자리로 입력해주세요.");
+
+        const btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = '저장중...';
+
+        const finalId = getNextIdStr();
+        const newPost = {
+            id: finalId,
+            date: date,
+            title: title,
+            content: content,
+            pw: pw,
+            lang: currentLang,
+            status: '접수대기',
+            createdAt: serverTimestamp()
+        };
+
+        try {
+            const docRef = await addDoc(collection(db, "posts"), newPost);
+            posts.push({ docId: docRef.id, ...newPost });
+            
+            alert(`접수되었습니다.\n본인 글 조회용 고유 번호는 [ ${finalId} ] 입니다.\n비밀번호와 함께 꼭 기억해주세요.`);
+            
+            document.getElementById('postTitle').value = '';
+            document.getElementById('postContent').value = '';
+            document.getElementById('postPw').value = '';
+            updateGeneratedIdView();
+        } catch (error) {
+            console.error("저장 실패: ", error);
+            alert("저장 중 오류가 발생했습니다.");
+        } finally {
+            btn.disabled = false;
+            btn.innerText = translations[currentLang].btnSubmit;
+        }
+    }
+
+    function findMyPost() {
+        const searchId = document.getElementById('searchId').value.trim();
+        const searchPw = document.getElementById('searchPw').value;
+        const post = posts.find(p => String(p.id) === String(searchId));
+
+        if (!post) return alert("해당 번호의 글이 존재하지 않습니다.");
+        if (post.pw !== searchPw) return alert("비밀번호가 일치하지 않습니다.");
+
+        openDetail(post.id);
+    }
+
+    function openLoginModal() { document.getElementById('loginModal').style.display = 'block'; }
+    function closeLoginModal() { document.getElementById('loginModal').style.display = 'none'; }
+    
+    function login() {
+        const id = document.getElementById('adminId').value;
+        const pw = document.getElementById('adminPw').value;
+
+        if (id === SUPER_ID && pw === SUPER_PW) {
+            isAdmin = true; isSuperAdmin = true; currentLoggedId = id;
+            loginSuccess(); return;
+        }
+
+        const isValid = adminAccounts.some(acc => acc.id === id && acc.pw === pw);
+        if (isValid) {
+            isAdmin = true; isSuperAdmin = false; currentLoggedId = id;
+            loginSuccess();
+        } else {
+            alert("아이디 또는 비밀번호가 일치하지 않습니다.");
+        }
+    }
+
+    function loginSuccess() {
+        closeLoginModal();
+        document.getElementById('adminId').value = '';
+        document.getElementById('adminPw').value = '';
+        
+        document.getElementById('userMode').style.display = 'none';
+        
+        if (isSuperAdmin) {
+            document.getElementById('adminMode').style.display = 'none';
+            document.getElementById('superAdminMode').style.display = 'block';
+        } else {
+            document.getElementById('adminMode').style.display = 'block';
+            document.getElementById('superAdminMode').style.display = 'none';
+            renderAdminTable();
+        }
+        
+        document.getElementById('adminLoginBtn').style.display = 'none';
+        document.getElementById('headerCreateAccBtn').style.display = 'block';
+        document.getElementById('accountManageBtn').style.display = 'block';
+        document.getElementById('adminLogoutBtn').style.display = 'block';
+    }
+
+    function logout() {
+        isAdmin = false; isSuperAdmin = false; currentLoggedId = null;
+        document.getElementById('userMode').style.display = 'block';
+        document.getElementById('adminMode').style.display = 'none';
+        document.getElementById('superAdminMode').style.display = 'none';
+        document.getElementById('postDetailModal').style.display = 'none';
+        
+        document.getElementById('adminLoginBtn').style.display = 'block';
+        document.getElementById('headerCreateAccBtn').style.display = 'none';
+        document.getElementById('accountManageBtn').style.display = 'none';
+        document.getElementById('adminLogoutBtn').style.display = 'none';
+    }
+
+    function openAccountModal() { document.getElementById('accountModal').style.display = 'block'; renderAccountList(); }
+    function closeAccountModal() { document.getElementById('accountModal').style.display = 'none'; }
+
+    function renderAccountList() {
+        const list = document.getElementById('accountList');
+        list.innerHTML = '';
+        adminAccounts.forEach(acc => {
+            let itemHtml = `<li style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
+                <span style="cursor:pointer; font-weight:bold; color:#2c3e50; text-decoration:underline;" onclick="openEditAccountModal('${acc.id}')">
+                    ID: ${acc.id} (${acc.name || '이름없음'})
+                </span>
+                <div>`;
+            if(isSuperAdmin) {
+                itemHtml += `<button class="btn-danger" style="padding: 2px 8px; font-size: 11px;" onclick="window.deleteAccount('${acc.id}')">삭제</button>`;
+            }
+            itemHtml += `</div></li>`;
+            list.innerHTML += itemHtml;
+        });
+    }
+
+    function openCreateAccountModal() { document.getElementById('createAccountModal').style.display = 'block'; }
+    function closeCreateAccountModal() { 
+        document.getElementById('createAccountModal').style.display = 'none'; 
+        document.getElementById('newAccId').value = ''; 
+        document.getElementById('newAccPw').value = ''; 
+        document.getElementById('newAccName').value = '';
+        document.getElementById('newAccContact').value = '';
+        document.getElementById('newAccEmail').value = '';
+    }
+
+    async function saveNewAccount() {
+        const id = document.getElementById('newAccId').value.trim();
+        const pw = document.getElementById('newAccPw').value.trim();
+        const name = document.getElementById('newAccName').value.trim();
+        const contact = document.getElementById('newAccContact').value.trim();
+        const email = document.getElementById('newAccEmail').value.trim();
+
+        if(!id || !pw || !name) return alert("아이디, 비밀번호, 이름은 필수 입력 항목입니다.");
+        if(id === SUPER_ID) return alert("해당 아이디는 생성할 수 없습니다.");
+
+        if(adminAccounts.find(a => a.id === id)) return alert("이미 존재하는 아이디입니다.");
+        
+        try {
+            const newAcc = { id, pw, name, contact, email };
+            const docRef = await addDoc(collection(db, "adminAccounts"), newAcc);
+            adminAccounts.push({ docId: docRef.id, ...newAcc });
+            alert(`'${id}' 계정이 추가되었습니다.`);
+            closeCreateAccountModal();
+            if(document.getElementById('accountModal').style.display === 'block') renderAccountList();
+        } catch(e) { console.error(e); alert("계정 생성 실패"); }
+    }
+
+    function openEditAccountModal(targetId) {
+        if(!isSuperAdmin && targetId !== currentLoggedId) return alert("본인 계정만 수정 가능합니다.");
+        const acc = adminAccounts.find(a => a.id === targetId);
+        if(!acc) return;
+
+        document.getElementById('editAccId').value = targetId;
+        document.getElementById('oldPwContainer').style.display = isSuperAdmin ? 'none' : 'block';
+        document.getElementById('editOldPw').value = '';
+        document.getElementById('editNewPw').value = '';
+        
+        document.getElementById('editAccName').value = acc.name || '';
+        document.getElementById('editAccContact').value = acc.contact || '';
+        document.getElementById('editAccEmail').value = acc.email || '';
+
+        document.getElementById('editAccountModal').style.display = 'block';
+    }
+    
+    function closeEditAccountModal() { document.getElementById('editAccountModal').style.display = 'none'; }
+
+    async function updateAccount() {
+        const targetId = document.getElementById('editAccId').value;
+        const newPw = document.getElementById('editNewPw').value.trim();
+        const name = document.getElementById('editAccName').value.trim();
+        const contact = document.getElementById('editAccContact').value.trim();
+        const email = document.getElementById('editAccEmail').value.trim();
+
+        const accIndex = adminAccounts.findIndex(a => a.id === targetId);
+        const acc = adminAccounts[accIndex];
+        
+        if(!isSuperAdmin) {
+            if(acc.pw !== document.getElementById('editOldPw').value.trim()) return alert("기존 비밀번호 불일치");
+        }
+
+        let updateData = { name, contact, email };
+        if(newPw) {
+            updateData.pw = newPw;
+        }
+
+        try {
+            await updateDoc(doc(db, "adminAccounts", acc.docId), updateData);
+            adminAccounts[accIndex].name = name;
+            adminAccounts[accIndex].contact = contact;
+            adminAccounts[accIndex].email = email;
+            if(newPw) adminAccounts[accIndex].pw = newPw;
+
+            alert("계정 정보 수정 완료");
+            closeEditAccountModal();
+            if(document.getElementById('accountModal').style.display === 'block') renderAccountList();
+        } catch(e) { console.error(e); alert("계정 정보 수정 실패"); }
+    }
+
+    async function deleteAccount(id) {
+        if(!isSuperAdmin) return alert("권한이 없습니다.");
+        if(confirm(`'${id}' 계정을 삭제하시겠습니까?`)) {
+            const acc = adminAccounts.find(a => String(a.id) === String(id));
+            if (!acc) return alert("삭제할 계정을 찾을 수 없습니다.");
+            try {
+                await deleteDoc(doc(db, "adminAccounts", acc.docId));
+                adminAccounts = adminAccounts.filter(a => String(a.id) !== String(id));
+                alert("계정이 삭제되었습니다.");
+                renderAccountList();
+            } catch(e) { 
+                console.error("삭제 에러:", e); 
+                alert("삭제 실패: " + e.message); 
+            }
+        }
+    }
+
+    function renderAdminTable() {
+        const tbody = document.getElementById('adminTableBody');
+        tbody.innerHTML = '';
+        
+        const sortedPosts = [...posts].sort((a, b) => b.id.localeCompare(a.id));
+        
+        sortedPosts.forEach(post => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="list-row" onclick="openDetail('${post.id}')">${post.id}</td>
+                <td class="list-row" onclick="openDetail('${post.id}')">${post.date}</td>
+                <td class="list-row" onclick="openDetail('${post.id}')">${post.title}</td>
+                <td>
+                    <select onchange="updateStatus('${post.id}', this.value)" style="margin:0; padding:5px; width:90%;">
+                        <option value="접수대기" ${post.status==='접수대기'?'selected':''}>접수대기</option>
+                        <option value="조치중" ${post.status==='조치중'?'selected':''}>조치중</option>
+                        <option value="조치완료" ${post.status==='조치완료'?'selected':''}>조치완료</option>
+                    </select>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function updateStatus(id, newStatus) {
+        const postIndex = posts.findIndex(p => String(p.id) === String(id));
+        if(postIndex !== -1) {
+            try {
+                await updateDoc(doc(db, "posts", posts[postIndex].docId), { status: newStatus });
+                posts[postIndex].status = newStatus;
+            } catch(e) { console.error(e); alert("상태 업데이트 실패"); }
+        }
+    }
+    
+    function updateStatusFromDetail(newStatus) { updateStatus(currentViewPostId, newStatus); }
+
+    function openDetail(id) {
+        currentViewPostId = id;
+        const post = posts.find(p => String(p.id) === String(id));
+        if(!post) return alert("해당 게시글을 찾을 수 없습니다.");
+        
+        isTranslated = false;
+        translatedCache = { title: "", content: "" };
+
+        document.getElementById('viewTitle').innerText = post.title;
+        document.getElementById('viewId').innerText = post.id;
+        document.getElementById('viewDate').innerText = post.date;
+        document.getElementById('viewContent').innerText = post.content;
+        
+        let langName = "한국어";
+        if(post.lang === 'ne') langName = "네팔어 (नेपाली)";
+        if(post.lang === 'bn') langName = "벵골어 (বাংলা)";
+        document.getElementById('viewLang').innerText = langName;
+
+        const translateBtn = document.getElementById('translateBtn');
+        if (isAdmin && post.lang && post.lang !== 'ko') {
+            translateBtn.style.display = 'block';
+            translateBtn.innerText = "🇰🇷 한국어 번역 보기";
+        } else {
+            translateBtn.style.display = 'none';
+        }
+
+        if(isAdmin) {
+            document.getElementById('viewStatusText').style.display = 'none';
+            document.getElementById('viewStatusSelect').style.display = 'inline-block';
+            document.getElementById('viewStatusSelect').value = post.status;
+        } else {
+            document.getElementById('viewStatusSelect').style.display = 'none';
+            document.getElementById('viewStatusText').style.display = 'inline';
+            document.getElementById('viewStatusText').innerText = post.status;
+        }
+        document.getElementById('postDetailModal').style.display = 'block';
+    }
+
+    // --- 관리자용 전체 자동 번역 API 기능 ---
+    async function toggleTranslation() {
+        const post = posts.find(p => String(p.id) === String(currentViewPostId));
+        if(!post) return;
+
+        const titleEl = document.getElementById('viewTitle');
+        const contentEl = document.getElementById('viewContent');
+        const translateBtn = document.getElementById('translateBtn');
+
+        if(!isTranslated) {
+            translateBtn.innerText = "번역 중...";
+            translateBtn.disabled = true;
+
+            try {
+                const sourceLang = post.lang; // 'ne' 또는 'bn'
+                const targetLang = 'ko';
+
+                // MyMemory 무료 번역 API 호출 (제목)
+                const titleRes = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(post.title)}&langpair=${sourceLang}|${targetLang}`);
+                const titleData = await titleRes.json();
+                const translatedTitle = titleData.responseData ? titleData.responseData.translatedText : post.title;
+
+                // MyMemory 무료 번역 API 호출 (본문)
+                const contentRes = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(post.content)}&langpair=${sourceLang}|${targetLang}`);
+                const contentData = await contentRes.json();
+                const translatedContent = contentData.responseData ? contentData.responseData.translatedText : post.content;
+
+                // 캐시에 저장
+                translatedCache.title = translatedTitle;
+                translatedCache.content = translatedContent;
+
+                titleEl.innerText = translatedTitle;
+                contentEl.innerText = translatedContent;
+                translateBtn.innerText = "원문 보기";
+                isTranslated = true;
+            } catch (error) {
+                console.error("번역 API 오류:", error);
+                alert("번역 중 오류가 발생했습니다.");
+            } finally {
+                translateBtn.disabled = false;
+            }
+        } else {
+            titleEl.innerText = post.title;
+            contentEl.innerText = post.content;
+            translateBtn.innerText = "🇰🇷 한국어 번역 보기";
+            isTranslated = false;
+        }
+    }
+    window.toggleTranslation = toggleTranslation;
+
+    function closeDetail() {
+        currentViewPostId = null;
+        isTranslated = false;
+        document.getElementById('postDetailModal').style.display = 'none';
+        if(isAdmin && !isSuperAdmin) renderAdminTable(); 
+    }
+
+    async function deletePost() {
+        if(confirm("정말로 이 내용을 삭제하시겠습니까?")) {
+            const post = posts.find(p => String(p.id) === String(currentViewPostId));
+            try {
+                await deleteDoc(doc(db, "posts", post.docId));
+                posts = posts.filter(p => p.docId !== post.docId);
+                alert("삭제되었습니다.");
+                closeDetail();
+                updateGeneratedIdView();
+            } catch(e) { console.error(e); alert("삭제 중 오류가 발생했습니다."); }
+        }
+    }
+
+    window.submitPost = submitPost;
+    window.findMyPost = findMyPost;
+    window.openLoginModal = openLoginModal;
+    window.closeLoginModal = closeLoginModal;
+    window.login = login;
+    window.logout = logout;
+    window.openAccountModal = openAccountModal;
+    window.closeAccountModal = closeAccountModal;
+    window.openCreateAccountModal = openCreateAccountModal;
+    window.closeCreateAccountModal = closeCreateAccountModal;
+    window.saveNewAccount = saveNewAccount;
+    window.openEditAccountModal = openEditAccountModal;
+    window.closeEditAccountModal = closeEditAccountModal;
+    window.updateAccount = updateAccount;
+    window.deleteAccount = deleteAccount;
+    window.updateStatus = updateStatus;
+    window.updateStatusFromDetail = updateStatusFromDetail;
+    window.openDetail = openDetail;
+    window.closeDetail = closeDetail;
+    window.deletePost = deletePost;
+</script>
+
+</body>
+</html>

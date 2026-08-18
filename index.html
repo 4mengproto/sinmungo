@@ -8,6 +8,7 @@
         /* 기본 스타일 설정 */
         body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; margin: 0; padding: 0; }
         header { background-color: #2c3e50; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
         h1 { margin: 0; font-size: 24px; }
         .container { max-width: 800px; margin: 30px auto; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         
@@ -24,6 +25,8 @@
         .btn-danger { background-color: #e74c3c; }
         .btn-danger:hover { background-color: #c0392b; }
         .btn-header { background-color: #ecf0f1; color: #2c3e50; margin-left: 5px; }
+        .btn-home { background-color: #16a085; color: white; text-decoration: none; padding: 8px 12px; border-radius: 4px; font-size: 14px; font-weight: bold; display: inline-block; }
+        .btn-home:hover { background-color: #138d75; }
 
         /* 팝업 모달 스타일 */
         .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
@@ -54,7 +57,10 @@
 <body>
 
 <header class="no-print">
-    <h1>익명 신문고</h1>
+    <div class="header-left">
+        <a href="https://4mengproto.github.io/Total-reserve/" class="btn-home">홈</a>
+        <h1>익명 신문고</h1>
+    </div>
     <div style="display: flex;">
         <button id="adminLoginBtn" class="btn-header" onclick="openLoginModal()">관리자 모드</button>
         <button id="headerCreateAccBtn" class="btn-header btn-success" onclick="openCreateAccountModal()" style="display:none; color:white;">+ 신규계정생성</button>
@@ -64,7 +70,6 @@
 </header>
 
 <div class="container" id="mainContainer">
-    <!-- 사용자 모드 (작성 폼) -->
     <div id="userMode">
         <h2>의견 작성 (익명)</h2>
         
@@ -94,7 +99,6 @@
         <button onclick="findMyPost()">조회하기</button>
     </div>
 
-    <!-- 일반 관리자 모드 (신문고 목록) -->
     <div id="adminMode" style="display:none;">
         <h2>접수된 신문고 목록</h2>
         <table>
@@ -110,15 +114,13 @@
         </table>
     </div>
 
-    <!-- 슈퍼 관리자 모드 -->
     <div id="superAdminMode" style="display:none; text-align: center; padding: 40px 0;">
         <h2>슈퍼 관리자 모드</h2>
-        <p style="color: #7f8c8d;">상단의 <strong>[신규계정생성]</strong> 버튼 또는 아래 버튼을 통해 관리자 계정을 관리하세요[cite: 1].</p>
+        <p style="color: #7f8c8d;">상단의 <strong>[신규계정생성]</strong> 버튼 또는 아래 버튼을 통해 관리자 계정을 관리하세요.</p>
         <button class="btn-success" onclick="openAccountModal()" style="font-size: 16px; padding: 15px 30px;">관리자 계정 목록 관리 열기</button>
     </div>
 </div>
 
-<!-- 상세 내용 확인 팝업 -->
 <div id="postDetailModal" class="modal">
     <div class="modal-content modal-content-large">
         <span class="close no-print" onclick="closeDetail()">&times;</span>
@@ -145,7 +147,6 @@
     </div>
 </div>
 
-<!-- 로그인 및 계정관리 팝업 모달들 -->
 <div id="loginModal" class="modal no-print">
     <div class="modal-content">
         <span class="close" onclick="closeLoginModal()">&times;</span>
@@ -206,7 +207,6 @@
     </div>
 </div>
 
-<!-- 스크립트 영역 -->
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
     import { getFirestore, collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
